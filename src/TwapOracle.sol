@@ -17,6 +17,7 @@ contract TwapOracle is ISovereignOracle {
 
     uint256 public cumulativeVolumeZeroToOne; // Volume for token0 -> token1 swaps
     uint256 public cumulativeVolumeOneToZero; // Volume for token1 -> token0 swaps
+    uint256 public minTimeElapsed;
 
     address private _token0;
     address private _token1;
@@ -26,12 +27,13 @@ contract TwapOracle is ISovereignOracle {
     error InsufficientDataForToken1();
     error InvalidToken();
 
-    constructor(address pool_) {
+    constructor(address pool_, uint256 minTimeElapsed_) {
         address[] memory tokens = ISovereignPool(pool_).getTokens();
         _pool = pool_;
         _token0 = tokens[0];
         _token1 = tokens[1];
         uint256 currentTimestamp = block.timestamp;
+        minTimeElapsed = minTimeElapsed_;
         zeroToOneObservations[zeroToOneIndex] = Observation(currentTimestamp, 0);
         oneToZeroObservations[oneToZeroIndex] = Observation(currentTimestamp, 0);
     }
@@ -53,6 +55,9 @@ contract TwapOracle is ISovereignOracle {
         uint256 timeElapsed;
         if (isZeroToOne) {
             timeElapsed = currentTimestamp - zeroToOneObservations[zeroToOneIndex].timestamp;
+            if (timeElapsed < minTimeElapsed) {
+                return;
+            }
             zeroToOneObservations[zeroToOneIndex].cumulativePrice += adjustedPrice * timeElapsed;
             cumulativeVolumeZeroToOne += amountInMinusFee;
 
@@ -66,6 +71,9 @@ contract TwapOracle is ISovereignOracle {
             );
         } else {
             timeElapsed = currentTimestamp - oneToZeroObservations[oneToZeroIndex].timestamp;
+            if (timeElapsed < minTimeElapsed) {
+                return;
+            }
             oneToZeroObservations[oneToZeroIndex].cumulativePrice += adjustedPrice * timeElapsed;
             cumulativeVolumeOneToZero += amountInMinusFee;
 

@@ -26,7 +26,7 @@ contract TwapOracleTest is Test {
     function setUp() public {
         // Initialize the mock pool and oracle
         mockPool = new MockSovereignPool(token0, token1);
-        oracle = new TwapOracle(address(mockPool));
+        oracle = new TwapOracle(address(mockPool), uint256(2));
     }
 
     function testInitialization() public {
@@ -120,5 +120,36 @@ contract TwapOracleTest is Test {
         uint256 window = 3600;
         vm.expectRevert(TwapOracle.InsufficientDataForToken1.selector);
         oracle.consult(token1, window);
+    }
+
+    function testMultipleSwapsOneToZeroOutInsideMinTimeElapsed() public {
+        // Simulate token1 -> token0 swaps over time
+        oracle.writeOracleUpdate(false, 150e18, 0.02e18, 75e18);
+        skip(3600); // 1 hour
+        oracle.writeOracleUpdate(false, 300e18, 0.02e18, 150e18);
+        uint256 window = 3600; // 2 hours
+        uint256 twap = oracle.consult(token1, window);
+        oracle.writeOracleUpdate(false, 300e18, 0.02e18, 150e18);
+        assertEq(twap, oracle.consult(token1, window));
+    }
+
+    function testMultipleSwapsZeroToOneOutInsideMinTimeElapsed() public {
+        // Simulate token1 -> token0 swaps over time
+        oracle.writeOracleUpdate(true, 150e18, 0.02e18, 75e18);
+        skip(3600); // 1 hour
+        oracle.writeOracleUpdate(true, 300e18, 0.02e18, 150e18);
+        uint256 window = 3600; // 2 hours
+        uint256 twap = oracle.consult(token1, window);
+        oracle.writeOracleUpdate(true, 300e18, 0.02e18, 150e18);
+        assertEq(twap, oracle.consult(token1, window));
+    }
+
+    function testPoolGetter() public {
+        assertEq(oracle.pool(), address(mockPool));
+    }
+
+    function testInvalidToken() public {
+        vm.expectRevert(TwapOracle.InvalidToken.selector);
+        oracle.consult(address(0x789), 3600);
     }
 }
