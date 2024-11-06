@@ -4,7 +4,7 @@
 
 ## Usage
 
-calling `Oracle.consult(token, window) will return a price averaged over the window in question
+calling `Oracle.consult(token, window)` will return a price averaged over the window in question
 
 ### Build
 
